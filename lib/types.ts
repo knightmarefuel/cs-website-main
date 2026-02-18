@@ -40,3 +40,53 @@ export type ClassSession = {
 };
 
 export type LeadType = "personal_training" | "new_community_class";
+
+export type Lead = {
+  id: string;
+  client_id: string;
+  type: LeadType;
+  preferred_time: string | null;
+  message: string | null;
+  created_at: string;
+};
+
+export type Booking = {
+  id: string;
+  session_id: string;
+  client_id: string;
+  status: "confirmed" | "cancelled" | "attended" | "no_show";
+  booked_at: string;
+  created_at: string;
+};
+
+export type BookingWithSession = Booking & {
+  class_sessions: ClassSession;
+};
+
+export type PaymentStatus = "pending" | "approved" | "rejected";
+
+export type PaymentSubmission = {
+  id: string;
+  client_id: string;
+  amount: number;
+  upi_ref: string | null;
+  session_id: string | null;
+  community_id: string | null;
+  screenshot_path: string | null;
+  status: PaymentStatus;
+  admin_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+};
+
+export type PaymentWithProfile = PaymentSubmission & {
+  profiles: Pick<Profile, "full_name" | "phone">;
+};
+
+// Session with computed spots
+export type SessionWithSpots = ClassSession & {
+  class_types?: ClassType;
+  booked_count: number;
+  remaining_spots: number;
+};
