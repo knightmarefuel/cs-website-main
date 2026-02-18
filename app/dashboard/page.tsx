@@ -107,7 +107,7 @@ export default function Dashboard() {
         let query = supabase
           .from("class_sessions")
           .select("*, class_types(*), bookings:bookings(count)")
-          .eq("community_id", profile.community_id)
+          .eq("community_id", communityId)
           .eq("status", "scheduled")
           .gte("start_time", startDate)
           .order("start_time", { ascending: true });
