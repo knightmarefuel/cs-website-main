@@ -2,119 +2,235 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Nav from "@/components/Nav";
+import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import { useAuth } from "@/app/providers";
+import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabaseClient";
+import { SkeletonTableRows } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import type { Community } from "@/lib/types";
 
 export default function AdminCommunities() {
   const router = useRouter();
   const { session, profile, loading } = useAuth();
+  const { addToast } = useToast();
 
   const [items, setItems] = useState<Community[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isAuthorized = profile?.role === "admin";
 
   useEffect(() => {
-    if (!loading && (!session || !profile)) return;
-    if (!loading && profile && profile.role !== "admin") router.push("/dashboard");
+    if (!loading && !session) router.push("/auth/sign-in");
+    if (!loading && session && !profile) router.push("/onboarding");
   }, [loading, session, profile, router]);
 
   async function load() {
-    setMsg(null);
+    setLoadingData(true);
     const { data, error } = await supabase
       .from("communities")
       .select("*")
       .order("name", { ascending: true });
 
-    if (error) return setMsg(error.message);
-    setItems((data as Community[]) ?? []);
+    if (error) {
+      addToast("danger", "Failed to load communities", error.message);
+    } else {
+      setItems((data as Community[]) ?? []);
+    }
+    setLoadingData(false);
   }
 
-  useEffect(() => { if (profile?.role === "admin") load(); }, [profile]);
+  useEffect(() => {
+    if (isAuthorized) load();
+  }, [isAuthorized]);
 
   async function addCommunity(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
+    if (!name.trim()) return;
+
+    setSubmitting(true);
     const { error } = await supabase.from("communities").insert({
       name: name.trim(),
       area: area.trim() || null,
-      is_active: true
+      is_active: true,
     });
-    if (error) return setMsg(error.message);
-    setName(""); setArea("");
-    await load();
+
+    if (error) {
+      addToast("danger", "Failed to add community", error.message);
+    } else {
+      addToast("success", "Community added");
+      setName("");
+      setArea("");
+      await load();
+    }
+    setSubmitting(false);
   }
 
   async function toggleActive(c: Community) {
-    setMsg(null);
     const { error } = await supabase
       .from("communities")
       .update({ is_active: !c.is_active })
       .eq("id", c.id);
-    if (error) return setMsg(error.message);
-    await load();
+
+    if (error) {
+      addToast("danger", "Update failed", error.message);
+    } else {
+      addToast("success", `Community ${c.is_active ? "deactivated" : "activated"}`);
+      await load();
+    }
   }
 
   async function remove(id: string) {
-    setMsg(null);
+    if (!confirm("Are you sure you want to delete this community?")) return;
+
     const { error } = await supabase.from("communities").delete().eq("id", id);
-    if (error) return setMsg(error.message);
-    await load();
+    if (error) {
+      addToast("danger", "Delete failed", error.message);
+    } else {
+      addToast("success", "Community deleted");
+      await load();
+    }
+  }
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="container">
+          <div className="card" style={{ padding: 40, textAlign: "center" }}>
+            <p className="text-muted">Loading...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <AppShell>
+        <div className="container">
+          <div className="not-authorized">
+            <div className="not-authorized-icon">🔒</div>
+            <h2 style={{ marginBottom: 8 }}>Access Restricted</h2>
+            <p className="text-muted" style={{ marginBottom: 24 }}>Admin access required.</p>
+            <Link href="/dashboard" className="btn btn-primary">Go to Dashboard</Link>
+          </div>
+        </div>
+      </AppShell>
+    );
   }
 
   return (
-    <main className="container">
-      <Nav />
-      <div className="card">
-        <h2>Manage Communities</h2>
-        {msg && <p className="error">{msg}</p>}
+    <AppShell>
+      <div className="container">
+        <div className="page-header">
+          <h1 className="page-title" data-testid="communities-title">Manage Communities</h1>
+          <p className="page-subtitle">Add and manage gated communities for fitness classes.</p>
+        </div>
 
-        <form onSubmit={addCommunity} className="card">
-          <h3>Add community</h3>
-          <div className="row">
-            <div className="col">
-              <label>Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <nav className="admin-nav">
+          <Link href="/admin" className="pill">← Back</Link>
+          <Link href="/admin/communities" className="pill pill-active">Communities</Link>
+          <Link href="/admin/class-types" className="pill">Class Types</Link>
+          <Link href="/admin/sessions" className="pill">Sessions</Link>
+          <Link href="/admin/payments" className="pill">Payments</Link>
+        </nav>
+
+        <div className="card mb-6">
+          <h3 className="card-title">Add Community</h3>
+          <form onSubmit={addCommunity} className="form" style={{ marginTop: 16 }}>
+            <div className="form-row form-row-2">
+              <div className="field">
+                <label className="field-label">Name *</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Green Valley Apartments"
+                  required
+                  data-testid="input-community-name"
+                />
+              </div>
+              <div className="field">
+                <label className="field-label">Area (optional)</label>
+                <input
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="e.g., Whitefield"
+                  data-testid="input-community-area"
+                />
+              </div>
             </div>
-            <div className="col">
-              <label>Area (optional)</label>
-              <input value={area} onChange={(e) => setArea(e.target.value)} />
+            <div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={submitting}
+                data-testid="add-community-btn"
+              >
+                {submitting ? "Adding..." : "Add Community"}
+              </button>
             </div>
+          </form>
+        </div>
+
+        {loadingData ? (
+          <div className="table-wrapper">
+            <SkeletonTableRows rows={5} />
           </div>
-          <div style={{ height: 12 }} />
-          <button type="submit">Add</button>
-        </form>
-
-        <div style={{ height: 10 }} />
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Area</th>
-              <th>Active</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td className="small">{c.area ?? "-"}</td>
-                <td><span className={`badge ${c.is_active ? "ok" : "danger"}`}>{c.is_active ? "active" : "inactive"}</span></td>
-                <td>
-                  <button onClick={() => toggleActive(c)} style={{ marginRight: 8 }}>
-                    {c.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button className="danger" onClick={() => remove(c.id)}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon="🏘️"
+            title="No communities yet"
+            message="Add your first community to get started."
+          />
+        ) : (
+          <div className="table-wrapper" data-testid="communities-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Area</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((c) => (
+                  <tr key={c.id} data-testid={`community-${c.id}`}>
+                    <td>{c.name}</td>
+                    <td className="td-muted">{c.area ?? "—"}</td>
+                    <td>
+                      <span className={`badge ${c.is_active ? "badge-success" : "badge-danger"}`}>
+                        {c.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="td-actions">
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => toggleActive(c)}
+                        data-testid={`toggle-${c.id}`}
+                      >
+                        {c.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => remove(c.id)}
+                        style={{ marginLeft: 8 }}
+                        data-testid={`delete-${c.id}`}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </main>
+    </AppShell>
   );
 }
