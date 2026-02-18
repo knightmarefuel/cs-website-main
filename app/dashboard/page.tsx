@@ -85,7 +85,8 @@ export default function Dashboard() {
         .order("name");
       if (typesData) setClassTypes(typesData as ClassType[]);
 
-      if (profile.community_id) {
+      const communityId = profile?.community_id;
+      if (communityId) {
         // Calculate date range
         const now = new Date();
         let startDate = now.toISOString();
