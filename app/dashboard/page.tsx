@@ -127,7 +127,7 @@ export default function Dashboard() {
         const { data: bookingsData } = await supabase
           .from("bookings")
           .select("*, class_sessions(*, class_types(*))")
-          .eq("client_id", profile.id)
+          .eq("client_id", profile?.id)
           .order("booked_at", { ascending: false })
           .limit(20);
         if (bookingsData) setMyBookings(bookingsData as any);
