@@ -136,7 +136,7 @@ export default function Dashboard() {
         const { data: paymentsData } = await supabase
           .from("payment_submissions")
           .select("*")
-          .eq("client_id", profile.id)
+          .eq("client_id", profile?.id)
           .order("created_at", { ascending: false })
           .limit(20);
         if (paymentsData) setMyPayments(paymentsData as PaymentSubmission[]);
