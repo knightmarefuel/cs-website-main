@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import type { Profile } from "@/lib/types";
+import { ToastProvider } from "@/components/Toast";
 
 type AuthState = {
   session: Session | null;
@@ -80,7 +81,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     [session, profile, loading]
   );
 
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+  return (
+    <AuthCtx.Provider value={value}>
+      <ToastProvider>{children}</ToastProvider>
+    </AuthCtx.Provider>
+  );
 }
 
 export function useAuth() {
