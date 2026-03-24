@@ -161,7 +161,7 @@ export default function Dashboard() {
     const { error } = await supabase.from("bookings").insert({
       session_id: sessionId,
       client_id: profile.id,
-      status: "confirmed",
+      status: "reserved",
       booked_at: new Date().toISOString(),
     });
 
